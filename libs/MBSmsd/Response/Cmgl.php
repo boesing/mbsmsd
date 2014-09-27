@@ -1,5 +1,20 @@
 <?php
 /**
+ * Most code in here is copied from the smstools3 PDU converter by Keijo Kasvi
+ * http://smstools3.kekekasvi.com/topic.php?id=288
+ *
+ * I've copied some functions from his javascript and converted it into PHP
+ * Those functions who are not identical, I created by inspiration of his 
+ * javascript code.
+ *
+ * Aswell - there are some functions from php.net comments or stackoverflow
+ * So all I want to say is - THANK YOU
+ * 
+ * If some1 finds his code in here and wants to be mentioned, just write me an 
+ * email
+ */
+
+/**
  * Cmgl.php
  *
  * @package MBSmsd
