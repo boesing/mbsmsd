@@ -1,0 +1,84 @@
+#!/usr/bin/php5
+<?php
+require_once __DIR__ . '/../autoload.php';
+
+use MBSmsd\Modem AS GSMModem;
+use MBSmsd\Message AS SMS;
+
+if( extension_loaded('posix') ) {
+    $userdata = posix_getpwuid( posix_getuid() );
+    if( isset($userdata['name']) && $userdata['name'] !== 'root' ) {
+        fwrite(STDERR, "Please execute this script as root!\n");
+        exit(1);
+    }
+}
+
+$shortOptions = 'hd::';
+$longOptions = array(
+    'help',
+    'device::',
+    'delete::',
+);
+
+function printUsage( $error=null )
+{
+    global $argv;
+    if( $error !== null ) {
+        fwrite(STDERR, $error . PHP_EOL);
+    }
+
+    echo "Usage: {$argv[0]} \n";
+    echo "\t-h|--help\t\tDisplay this message\n";
+    echo "\t-d|--device\t\tDefines the device, default /dev/ttyUSB0\n";
+    echo "\t--delete <what>\t\tSpecify this if you want to delete a message by id, specify ALL to delete every single message, specify date to delete older than date\n";
+}
+
+$options = getopt( $shortOptions, $longOptions );
+if( array_key_exists('help', $options) || array_key_exists('h', $options) ) {
+    printUsage();
+    exit(0);
+}
+
+if( !isset($options['device']) && !isset($options['d']) ) {
+    $options['device'] = '/dev/ttyUSB0';
+}
+$device = isset($options['device'])?$options['device']:$options['d'];
+$delete = isset($options['delete'])?$options['delete']:false;
+$modem = new GSMModem( $device );
+$modem->open();
+
+if( $delete !== false && $delete == 'ALL' ) {
+    $command = new MBSmsd\Request\Cmgd( $modem );
+    $command->setFlag( $command::F_DELETE_ALL ); // DELETE ALL
+    $command->execute(); 
+    print "+----------------------\n";
+    print "| Deleted all messages.\n";
+    print "+----------------------\n";
+    exit(0);
+}
+
+$messages = $modem->getMailboxMessages();
+$count = count($messages);
+print "Found $count messages\n";
+
+foreach( $messages AS $message ) {
+    if( $delete !== false ) {
+        if( $message->getMessageId() == $delete ) {
+            $message->delete();
+            print "+----------------------\n";
+            print "| Deleted message #$delete.\n";
+            print "+----------------------\n";
+            continue;
+        } else if( ($deleteDate = new \DateTime( $delete )) instanceOf \DateTime && $deleteDate->diff( new \DateTime($message->getTimestamp()) )->invert == 1 ) {
+            echo "TODO: should delete because \"{$message->getTimestamp('d.m.Y H:i:s')}\" is older than \"$delete\", right?\n";
+        } 
+    }
+
+    print "+----------------------\n";
+    print "| Message ID: {$message->getMessageId()}\n";
+    print "| Date: {$message->getTimestamp('d.m.Y H:i:s')}\n";
+    print "| Sender: {$message->getSender()}\n";
+    print "| Recipient: {$message->getReceiver()}\n";
+    print "| $message\n";
+    print "+----------------------\n";
+}

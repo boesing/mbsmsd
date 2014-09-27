@@ -1,0 +1,72 @@
+#!/usr/bin/php5
+<?php
+require_once __DIR__ . '/../autoload.php';
+
+use MBSmsd\Modem AS GSMModem;
+use MBSmsd\Message AS SMS;
+
+$shortOptions = 'n:t:hd::';
+$longOptions = array(
+    'help',
+    'number:',
+    'text:',
+    'device::',
+);
+
+function printUsage( $error=null )
+{
+    global $argv;
+    if( $error !== null ) {
+        fwrite(STDERR, $error . PHP_EOL);
+    }
+
+    echo "Usage: {$argv[0]} \n";
+    echo "\t-h|--help\t\tDisplay this message\n";
+    echo "\t-d|--device\t\tDefines the device, default /dev/ttyUSB0\n";
+    echo "\t-t|--text\t\tDefines the text we want sent\n";
+    echo "\t-n|--number\t\tDefines the number we want to send to\n";
+}
+
+$options = getopt( $shortOptions, $longOptions );
+if( array_key_exists('help', $options) || array_key_exists('h', $options) || empty($options) ) {
+    printUsage();
+    exit(0);
+}
+
+if( !isset($options['device']) && !isset($options['d']) ) {
+    $options['device'] = '/dev/ttyUSB0';
+}
+
+if( !isset($options['number']) && !isset($options['n']) ) {
+    printUsage( "Missing required parameter -n|--number");
+    exit(1);
+}
+
+if( !isset($options['text']) && !isset($options['t']) ) {
+    printUsage( "Missing required parameter -t|--text");
+    exit(1);
+}
+
+
+$text = isset($options['text'])?$options['text']:$options['t'];
+$number = isset($options['number'])?$options['number']:$options['n'];
+$device = isset($options['device'])?$options['device']:$options['d'];
+
+$modem = new GSMModem( $device );
+$modem->open();
+
+$message = new SMS;
+$message->setText($text);
+$message->setReceiver( $number );
+$message->setSMSC('01710760000');
+
+$command = new \MBSmsd\Request\Cmgs( $modem );
+$command->setMessage( $message );
+
+try {
+    $result = $command->execute();
+} catch( Exception $e ) {
+    $result = $e->getMessage();
+}
+
+print $result . PHP_EOL;

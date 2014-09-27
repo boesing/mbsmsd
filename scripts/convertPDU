@@ -1,0 +1,22 @@
+#!/usr/bin/php5
+<?php
+require_once __DIR__ . '/../autoload.php';
+
+if( !isset($argv[1]) ) {
+    echo "Usage: {$argv[0]} <message>\n";
+    exit(1);
+}
+
+$converter = new \MBSmsd\Converter\Pdu;
+
+/**
+ * Removed 7-Bit since i realized that the german CUSD-Responses are UCS2
+ * if you need 7-Bit, just uncomment these lines
+ */
+$converted = rtrim($converter->decodeGSM7Bit( $argv[1] ));
+print "GSM 7-Bit: $converted\n";
+print "\n\n";
+// */
+
+$converted = rtrim($converter->decodeUCS2( $argv[1] ));
+print "UCS2: {$converted}\n";

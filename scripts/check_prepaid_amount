@@ -1,0 +1,117 @@
+#!/usr/bin/php5
+<?php
+require_once __DIR__ . '/../autoload.php';
+
+new \MBSmsd\Loader('MBSmsd');
+use MBSmsd\Modem AS GSMModem;
+
+##################################################################
+#   Configuration
+$defaultRegex = '([0-9.,]+)';
+define('NAGIOS_OK',0);
+define('NAGIOS_WARNING',1);
+define('NAGIOS_CRITICAL',2);
+define('NAGIOS_UNKNOWN',3);
+
+if( !extension_loaded('dio') ) {
+    echo "Missing required PHP-Module \"dio\". Please install pecl-package \"dio\" for this script!\n";
+    exit(NAGIOS_UNKNOWN);
+}
+
+$shortOptions = 'hw:c:r::d:';
+$longOptions = array(
+    'help',
+    'warning:',
+    'critical:',
+    'device:',
+    'regex::',
+    'code::',
+);
+
+function printUsage( $error=null )
+{
+    global $argv;
+    if( $error !== null ) {
+        fwrite(STDERR, $error . PHP_EOL);
+    }
+
+    echo "Usage: {$argv[0]} \n";
+    echo "\t-h|--help\t\tDisplay this message\n";
+    echo "\t-w|--warning\t\tREQUIRED defines the warning threshold\n";
+    echo "\t-c|--critical\t\tREQUIRED defines the critical threshold\n";
+    echo "\t-d|--device\t\tREQUIRED defines the modem device, e.g. /dev/ttyUSB1\n";
+    echo "\t-r|--regex\t\tOPTIONAL specifies the regex to extract the amount from the CUSD Response\n";
+    echo "\t--code\t\tOPTIONAL specifies the code we want to send to get the prepaid amount\n";
+}
+
+$options = getopt( $shortOptions, $longOptions );
+
+if( array_key_exists('help', $options) || array_key_exists('h', $options) || empty($options) ) {
+    printUsage();
+    exit(NAGIOS_UNKNOWN);
+}
+
+
+##################################################################
+#   Check for required parameters
+
+if( !isset($options['device']) && !isset($options['d']) ) {
+    printUsage( "Missing required parameter -d|--device" );
+    exit(NAGIOS_UNKNOWN);
+}
+
+if( !isset($options['warning']) && !isset($options['w']) ) {
+    printUsage( "Missing required parameter -w|--warning" );
+    exit(NAGIOS_UNKNOWN);
+}
+
+if( !isset($options['critical']) && !isset($options['c']) ) {
+    printUsage( "Missing required parameter -c|--critical" );
+    exit(NAGIOS_UNKNOWN);
+}
+
+
+$regexToExtractAmount = $defaultRegex;
+if( isset($options['r']) ) {
+    $regexToExtractAmount = $options['r'];    
+} else if( isset($options['regex']) ) {
+    $regexToExtractAmount = $options['regex'];
+}
+if( !isset($options['code']) ) {
+    $code = '*100#';
+} else {
+    $code = $options['code'];
+}
+
+$device     = isset($options['device'])?$options['device']:$options['d'];
+$warning    = isset($options['warning'])?$options['warning']:$options['w'];
+$critical   = isset($options['critical'])?$options['critical']:$options['c'];
+
+if( !is_numeric($warning) || !is_numeric($critical) ) {
+    throw new \InvalidArgumentException("warning and/or critical threshold is not numeric");
+}
+
+if( $warning < $critical ) {
+    throw new \InvalidArgumentException("warning must be higher than critical threshold");
+}
+
+$modem = new GSMModem( $device );
+$modem->open();
+
+
+$response = $modem->getPrepaidAmount($code);
+$amount = $response->getValue($regexToExtractAmount);
+
+if( $amount < $critical ) {
+    print "PREPAID AMOUNT CRITICAL: ";;
+    $exitCode = NAGIOS_CRITICAL;
+} else if( $amount < $warning ) {
+    print "PREPAID AMOUNT WARNING: ";
+    $exitCode = NAGIOS_WARNING;
+} else {
+    print "PREPAID AMOUNT OK: ";
+    $exitCode = NAGIOS_OK;
+}
+
+print "Current prepaid amount is \"$amount\"\n";
+exit( $exitCode );

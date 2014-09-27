@@ -1,0 +1,39 @@
+#!/bin/bash
+DEVICE=$1
+WARNING=$2
+CRITICAL=$3
+
+NAGIOS_OK=0
+NAGIOS_WARNING=1
+NAGIOS_CRITICAL=2
+NAGIOS_UNKNOWN=3
+
+if [ -z "$DEVICE" ]; then
+    echo "Missing device";
+    exit $NAGIOS_CRITICAL;
+fi
+
+if [ -z "$WARNING" ]; then
+    echo "Missing warning count";
+    exit $NAGIOS_CRITICAL;
+fi
+
+if [ -z "$CRITICAL" ]; then
+    echo "Missing critical count";
+    exit $NAGIOS_CRITICAL;
+fi
+
+MESSAGESSCRIPT="$(dirname $(realpath $0))/messages";
+
+OUTPUT=$($MESSAGESSCRIPT -d"$DEVICE" | egrep "^Found [0-9]*" | awk '{ print $2 }' );
+
+if [ "$OUTPUT" -lt "$CRITICAL" ]; then
+    if [ "$OUTPUT" -lt "$WARNING" ]; then
+        echo "UNREAD Messagecount OK: $OUTPUT unread messages";
+        exit $NAGIOS_OK;
+    fi
+    echo "UNREAD Messagecount WARNING: $OUTPUT unread messages";
+    exit $NAGIOS_WARNING;
+fi
+echo "UNREAD Messagecount CRITICAL: $OUTPUT unread messages";
+exit $NAGIOS_CRITICAL;
